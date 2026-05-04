@@ -1,0 +1,539 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ES/NQ Macro Dashboard</title>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #f5f5f3; color: #1a1a1a; font-size: 14px; }
+  .container { max-width: 920px; margin: 0 auto; padding: 28px 20px; }
+
+  .header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 20px; flex-wrap: wrap; gap: 12px; }
+  .header-left h1 { font-size: 18px; font-weight: 600; margin-bottom: 3px; }
+  .header-left .subtitle { font-size: 12px; color: #888; }
+  .last-refresh { font-size: 11px; color: #aaa; margin-top: 4px; }
+
+  .api-bar { display: flex; gap: 8px; margin-bottom: 8px; flex-wrap: wrap; }
+  .api-bar input { flex: 1; min-width: 200px; padding: 8px 12px; border: 1px solid #d0d0cc; border-radius: 8px; font-size: 13px; background: #fff; color: #1a1a1a; }
+  .api-bar input:focus { outline: none; border-color: #888; }
+  .btn { padding: 8px 16px; border: 1px solid #d0d0cc; border-radius: 8px; background: #fff; font-size: 13px; cursor: pointer; white-space: nowrap; color: #1a1a1a; transition: background 0.15s; }
+  .btn:hover { background: #ebebea; }
+  .btn:active { transform: scale(0.98); }
+  .btn.primary { background: #1a1a1a; color: #fff; border-color: #1a1a1a; }
+  .btn.primary:hover { background: #333; }
+  .btn.primary:disabled { background: #999; border-color: #999; cursor: not-allowed; transform: none; }
+  .btn.refresh { display: none; }
+  .btn.refresh.visible { display: inline-block; }
+
+  .auto-row { display: flex; align-items: center; gap: 10px; margin-bottom: 14px; }
+  .auto-row label { font-size: 12px; color: #888; display: flex; align-items: center; gap: 6px; cursor: pointer; }
+  .auto-row select { font-size: 12px; padding: 3px 6px; border: 1px solid #d0d0cc; border-radius: 6px; background: #fff; color: #1a1a1a; cursor: pointer; }
+
+  .status { font-size: 12px; color: #888; margin-bottom: 16px; min-height: 16px; }
+  .status a { color: #378ADD; text-decoration: none; }
+  .status.error { color: #e24b4a; }
+  .status.success { color: #3B6D11; }
+
+  .tab-bar { display: flex; gap: 2px; border-bottom: 1px solid #e0e0dc; margin-bottom: 20px; }
+  .tab { padding: 9px 16px; background: none; border: none; font-size: 13px; color: #888; cursor: pointer; border-bottom: 2px solid transparent; margin-bottom: -1px; transition: color 0.15s; }
+  .tab.active { color: #1a1a1a; border-bottom-color: #1a1a1a; font-weight: 500; }
+  .tab:hover:not(.active) { color: #1a1a1a; }
+  .panel { display: none; }
+  .panel.active { display: block; }
+
+  .section-label { font-size: 11px; font-weight: 600; color: #888; text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 10px; margin-top: 20px; }
+  .cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(138px, 1fr)); gap: 10px; margin-bottom: 4px; }
+  .card { background: #fff; border: 1px solid #e8e8e4; border-radius: 10px; padding: 14px; transition: border-color 0.2s; }
+  .card .lbl { font-size: 11px; color: #888; margin-bottom: 8px; }
+  .card .val { font-size: 22px; font-weight: 600; color: #1a1a1a; line-height: 1; min-height: 26px; }
+  .card .meta { font-size: 11px; color: #bbb; margin-top: 6px; }
+  .card.loading .val { color: #ddd; animation: pulse 1.2s ease-in-out infinite; }
+  .card.error { border-color: #f0c0c0; }
+  .card.error .val { color: #e24b4a; font-size: 14px; margin-top: 4px; }
+  .card.loaded { border-color: #c8e0b8; }
+
+  @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.4} }
+
+  .impact-table { width: 100%; border-collapse: collapse; margin-top: 8px; }
+  .impact-table th { text-align: left; font-size: 11px; font-weight: 600; color: #888; text-transform: uppercase; letter-spacing: 0.04em; padding: 6px 10px; border-bottom: 1px solid #e8e8e4; }
+  .impact-table td { padding: 10px; border-bottom: 1px solid #f0f0ec; font-size: 13px; vertical-align: top; }
+  .impact-table tr:last-child td { border-bottom: none; }
+  .impact-table .iname { font-weight: 500; }
+  .impact-table .inote { color: #666; font-size: 12px; margin-top: 2px; line-height: 1.5; }
+
+  .badge { display: inline-block; padding: 2px 8px; border-radius: 20px; font-size: 11px; font-weight: 600; }
+  .badge.high { background: #FCEBEB; color: #A32D2D; }
+  .badge.med  { background: #FEF3DC; color: #7A4A00; }
+  .badge.low  { background: #EAF3DE; color: #2E6B10; }
+
+  .day-block { margin-bottom: 20px; }
+  .day-header { font-size: 13px; font-weight: 600; padding: 7px 0; border-bottom: 1px solid #e0e0dc; margin-bottom: 6px; display: flex; justify-content: space-between; align-items: baseline; }
+  .day-sub { font-size: 11px; color: #999; font-weight: 400; }
+  .event { display: grid; grid-template-columns: 90px 1fr; gap: 10px; padding: 8px 10px; border-radius: 8px; align-items: start; }
+  .event:hover { background: #f5f5f3; }
+  .etime { font-size: 12px; color: #999; padding-top: 2px; white-space: nowrap; }
+  .ename { font-size: 13px; font-weight: 500; color: #1a1a1a; }
+  .enote { font-size: 11px; color: #777; margin-top: 3px; line-height: 1.5; }
+
+  .divider { height: 1px; background: #e8e8e4; margin: 20px 0; }
+  .footnote { font-size: 11px; color: #999; line-height: 1.8; }
+  .footnote a { color: #378ADD; text-decoration: none; }
+  .footnote a:hover { text-decoration: underline; }
+
+  .key-hint { font-size: 11px; color: #bbb; margin-top: 4px; }
+
+  @media (max-width: 600px) {
+    .cards { grid-template-columns: repeat(2, 1fr); }
+    .header { flex-direction: column; }
+  }
+
+  @media (prefers-color-scheme: dark) {
+    body { background: #161616; color: #e0e0dc; }
+    .card { background: #1e1e1e; border-color: #2e2e2e; }
+    .card .lbl { color: #777; }
+    .card .val { color: #e0e0dc; }
+    .card .meta { color: #555; }
+    .card.loading .val { color: #444; }
+    .card.loaded { border-color: #2a4a1e; }
+    .card.error { border-color: #4a1e1e; }
+    .api-bar input { background: #1e1e1e; border-color: #3a3a3a; color: #e0e0dc; }
+    .api-bar input::placeholder { color: #555; }
+    .btn { background: #1e1e1e; border-color: #3a3a3a; color: #e0e0dc; }
+    .btn:hover { background: #2a2a2a; }
+    .btn.primary { background: #e0e0dc; color: #161616; border-color: #e0e0dc; }
+    .btn.primary:hover { background: #ccc; }
+    .auto-row select { background: #1e1e1e; border-color: #3a3a3a; color: #e0e0dc; }
+    .tab { color: #666; }
+    .tab.active { color: #e0e0dc; border-bottom-color: #e0e0dc; }
+    .tab-bar { border-color: #2e2e2e; }
+    .impact-table td, .impact-table th { border-color: #2e2e2e; }
+    .impact-table .inote { color: #888; }
+    .day-header { border-color: #2e2e2e; }
+    .event:hover { background: #1e1e1e; }
+    .divider { background: #2e2e2e; }
+    .last-refresh { color: #555; }
+    .badge.high { background: #3a1010; color: #f09595; }
+    .badge.med  { background: #3a2a00; color: #FAC775; }
+    .badge.low  { background: #1a3010; color: #97C459; }
+  }
+</style>
+</head>
+<body>
+<div class="container">
+
+  <div class="header">
+    <div class="header-left">
+      <h1>ES / NQ Macro Dashboard</h1>
+      <div class="subtitle">Key economic indicators for futures traders &middot; All times Pacific (PT)</div>
+      <div class="last-refresh" id="lastRefresh"></div>
+    </div>
+  </div>
+
+  <div class="api-bar">
+    <input type="password" id="apiKey" placeholder="Paste your FRED API key" autocomplete="off" />
+    <button class="btn primary" id="loadBtn" onclick="loadAll()">Load data</button>
+    <button class="btn refresh" id="refreshBtn" onclick="loadAll()">&#8635; Refresh</button>
+  </div>
+
+  <div class="auto-row">
+    <label>
+      <input type="checkbox" id="autoRefresh" onchange="toggleAutoRefresh()" />
+      Auto-refresh every
+    </label>
+    <select id="refreshInterval">
+      <option value="300">5 min</option>
+      <option value="900">15 min</option>
+      <option value="1800">30 min</option>
+      <option value="3600">1 hr</option>
+    </select>
+  </div>
+
+  <div class="status" id="status">
+    Enter your FRED API key above and click Load data. Get a free key at
+    <a href="https://fred.stlouisfed.org/docs/api/api_key.html" target="_blank">fred.stlouisfed.org</a>.
+  </div>
+
+  <div class="tab-bar">
+    <button class="tab active" onclick="switchTab('data', this)">Live indicators</button>
+    <button class="tab" onclick="switchTab('cal', this)">Economic calendar</button>
+  </div>
+
+  <!-- LIVE DATA PANEL -->
+  <div id="panel-data" class="panel active">
+
+    <div class="section-label">Rate &amp; inflation signals</div>
+    <div class="cards">
+      <div class="card" id="card-FEDFUNDS">
+        <div class="lbl">Fed funds rate</div>
+        <div class="val" id="val-FEDFUNDS">—</div>
+        <div class="meta" id="meta-FEDFUNDS">not loaded</div>
+      </div>
+      <div class="card" id="card-CPIAUCSL">
+        <div class="lbl">CPI YoY</div>
+        <div class="val" id="val-CPIAUCSL">—</div>
+        <div class="meta" id="meta-CPIAUCSL">not loaded</div>
+      </div>
+      <div class="card" id="card-PCEPILFE">
+        <div class="lbl">Core PCE YoY</div>
+        <div class="val" id="val-PCEPILFE">—</div>
+        <div class="meta" id="meta-PCEPILFE">not loaded</div>
+      </div>
+      <div class="card" id="card-DGS10">
+        <div class="lbl">10-yr Treasury</div>
+        <div class="val" id="val-DGS10">—</div>
+        <div class="meta" id="meta-DGS10">not loaded</div>
+      </div>
+      <div class="card" id="card-DGS2">
+        <div class="lbl">2-yr Treasury</div>
+        <div class="val" id="val-DGS2">—</div>
+        <div class="meta" id="meta-DGS2">not loaded</div>
+      </div>
+      <div class="card" id="card-T10Y2Y">
+        <div class="lbl">Yield curve (2s10s)</div>
+        <div class="val" id="val-T10Y2Y">—</div>
+        <div class="meta" id="meta-T10Y2Y">not loaded</div>
+      </div>
+    </div>
+
+    <div class="section-label">Labor &amp; growth</div>
+    <div class="cards">
+      <div class="card" id="card-UNRATE">
+        <div class="lbl">Unemployment rate</div>
+        <div class="val" id="val-UNRATE">—</div>
+        <div class="meta" id="meta-UNRATE">not loaded</div>
+      </div>
+      <div class="card" id="card-ICSA">
+        <div class="lbl">Initial jobless claims</div>
+        <div class="val" id="val-ICSA">—</div>
+        <div class="meta" id="meta-ICSA">not loaded</div>
+      </div>
+      <div class="card" id="card-A191RL1Q225SBEA">
+        <div class="lbl">Real GDP QoQ</div>
+        <div class="val" id="val-A191RL1Q225SBEA">—</div>
+        <div class="meta" id="meta-A191RL1Q225SBEA">not loaded</div>
+      </div>
+      <div class="card" id="card-RSXFS">
+        <div class="lbl">Retail sales MoM</div>
+        <div class="val" id="val-RSXFS">—</div>
+        <div class="meta" id="meta-RSXFS">not loaded</div>
+      </div>
+      <div class="card" id="card-MANEMP">
+        <div class="lbl">Mfg employment</div>
+        <div class="val" id="val-MANEMP">—</div>
+        <div class="meta" id="meta-MANEMP">not loaded</div>
+      </div>
+      <div class="card" id="card-UMCSENT">
+        <div class="lbl">Consumer sentiment</div>
+        <div class="val" id="val-UMCSENT">—</div>
+        <div class="meta" id="meta-UMCSENT">not loaded</div>
+      </div>
+    </div>
+
+    <div class="divider"></div>
+    <div class="section-label">Why these matter for ES / NQ</div>
+    <table class="impact-table">
+      <thead>
+        <tr><th>Indicator</th><th>Impact</th><th>What it means for futures</th></tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><div class="iname">CPI / Core PCE</div></td>
+          <td><span class="badge high">High</span></td>
+          <td><div class="inote">Hot print → rates stay high → ES/NQ sell-off. Cool print → rally fuel. Biggest single-day vol driver.</div></td>
+        </tr>
+        <tr>
+          <td><div class="iname">Fed funds rate</div></td>
+          <td><span class="badge high">High</span></td>
+          <td><div class="inote">Sets the risk-free rate. Rising rate regime compresses PE multiples — especially damaging for NQ (tech heavy).</div></td>
+        </tr>
+        <tr>
+          <td><div class="iname">10-yr / 2-yr yields</div></td>
+          <td><span class="badge high">High</span></td>
+          <td><div class="inote">10-yr drives equity discount rates. 2s10s inversion historically precedes recession — uninversion = regime shift signal.</div></td>
+        </tr>
+        <tr>
+          <td><div class="iname">NFP / Jobless claims</div></td>
+          <td><span class="badge high">High</span></td>
+          <td><div class="inote">Strong jobs = Fed stays hawkish. Weak jobs = rate cut narrative. Claims give a weekly early read on labor softening.</div></td>
+        </tr>
+        <tr>
+          <td><div class="iname">GDP (advance)</div></td>
+          <td><span class="badge med">Med</span></td>
+          <td><div class="inote">Advance print moves markets most. Confirms or denies recession narrative already priced in by markets.</div></td>
+        </tr>
+        <tr>
+          <td><div class="iname">ISM PMI</div></td>
+          <td><span class="badge med">Med</span></td>
+          <td><div class="inote">Below 50 = contraction. Forward-looking. New orders sub-index most market-moving. Often leads GDP by months.</div></td>
+        </tr>
+        <tr>
+          <td><div class="iname">Retail sales</div></td>
+          <td><span class="badge med">Med</span></td>
+          <td><div class="inote">Consumer spending = ~70% of GDP. A miss feeds the recession/stagflation trade and can push ES toward key support.</div></td>
+        </tr>
+        <tr>
+          <td><div class="iname">Consumer sentiment</div></td>
+          <td><span class="badge low">Low</span></td>
+          <td><div class="inote">Lagging indicator. Best for confirming consumer stress themes over weeks, not for intraday trading setups.</div></td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <!-- CALENDAR PANEL -->
+  <div id="panel-cal" class="panel">
+    <p style="font-size:12px;color:#888;margin-bottom:18px;">All times Pacific (PT). NY open = 6:30 AM PT. The major macro prints hit at 5:30 AM PT — be at your desk or flat before these drop.</p>
+
+    <div class="day-block">
+      <div class="day-header">Monday <span class="day-sub">Lightest day — survey &amp; sentiment data</span></div>
+      <div class="event">
+        <span class="etime">7:00 AM PT</span>
+        <div><div class="ename">ISM Manufacturing PMI <span class="badge med">Med</span></div><div class="enote">First Mon of month. New orders sub-index is most critical. Sub-50 = contraction signal for ES.</div></div>
+      </div>
+      <div class="event">
+        <span class="etime">7:00 AM PT</span>
+        <div><div class="ename">ISM Services PMI <span class="badge med">Med</span></div><div class="enote">First Mon of month (services week). Prices paid sub-index = inflation pressure read.</div></div>
+      </div>
+      <div class="event">
+        <span class="etime">Varies</span>
+        <div><div class="ename">Fed speaker remarks <span class="badge med">Med</span></div><div class="enote">Check Fed calendar. Hawkish tone = yields up, futures down. Watch for dissent vs consensus language.</div></div>
+      </div>
+    </div>
+
+    <div class="day-block">
+      <div class="day-header">Tuesday <span class="day-sub">Jobs &amp; confidence data</span></div>
+      <div class="event">
+        <span class="etime">5:30 AM PT</span>
+        <div><div class="ename">JOLTS job openings <span class="badge med">Med</span></div><div class="enote">~1st Tue of month. Fed watches quits rate as wage pressure proxy. Pre-market — futures already reacting at this hour.</div></div>
+      </div>
+      <div class="event">
+        <span class="etime">7:00 AM PT</span>
+        <div><div class="ename">Consumer confidence (Conference Board) <span class="badge low">Low</span></div><div class="enote">Last Tue of month. Divergence from UMich can signal a consumer stress shift.</div></div>
+      </div>
+      <div class="event">
+        <span class="etime">Varies</span>
+        <div><div class="ename">Treasury auctions (2-yr, 5-yr) <span class="badge low">Low</span></div><div class="enote">Weak auction = yields spike = equity headwind. Bid-to-cover ratio is the key tell.</div></div>
+      </div>
+    </div>
+
+    <div class="day-block">
+      <div class="day-header">Wednesday <span class="day-sub">Highest vol day — CPI &amp; FOMC</span></div>
+      <div class="event">
+        <span class="etime">5:30 AM PT</span>
+        <div><div class="ename">CPI <span class="badge high">High</span></div><div class="enote">~12th of each month. Biggest single-day vol driver for ES/NQ. Core MoM surprises = 1–2% gap at open. Be positioned or flat before this.</div></div>
+      </div>
+      <div class="event">
+        <span class="etime">7:30 AM PT</span>
+        <div><div class="ename">EIA crude oil inventories <span class="badge low">Low</span></div><div class="enote">Weekly. Primarily a CL driver, but energy prices feed the broader CPI/inflation narrative.</div></div>
+      </div>
+      <div class="event">
+        <span class="etime">11:00 AM PT</span>
+        <div><div class="ename">FOMC rate decision + statement <span class="badge high">High</span></div><div class="enote">8x per year. Initial spike on decision, then second vol wave on Powell presser at 11:30 AM PT. Avoid entering new positions into the print.</div></div>
+      </div>
+      <div class="event">
+        <span class="etime">11:30 AM PT</span>
+        <div><div class="ename">Powell press conference <span class="badge high">High</span></div><div class="enote">Quarterly (dot plot meetings). Every word parsed for forward guidance. "Data dependent" = wider ranges through close.</div></div>
+      </div>
+      <div class="event">
+        <span class="etime">Varies</span>
+        <div><div class="ename">Treasury 10-yr auction <span class="badge med">Med</span></div><div class="enote">Mid-month. Weak demand = yields jump = NQ pressure into late session.</div></div>
+      </div>
+    </div>
+
+    <div class="day-block">
+      <div class="day-header">Thursday <span class="day-sub">Weekly jobs + PPI — busy pre-market</span></div>
+      <div class="event">
+        <span class="etime">5:30 AM PT</span>
+        <div><div class="ename">Initial jobless claims <span class="badge high">High</span></div><div class="enote">Every Thursday without fail. Most frequent labor read. Spiking claims = labor softening = rate cut narrative accelerates.</div></div>
+      </div>
+      <div class="event">
+        <span class="etime">5:30 AM PT</span>
+        <div><div class="ename">PPI (producer prices) <span class="badge med">Med</span></div><div class="enote">~11th of month. Hot PPI = leading CPI signal. Core PPI services = most Fed-relevant sub-index.</div></div>
+      </div>
+      <div class="event">
+        <span class="etime">5:30 AM PT</span>
+        <div><div class="ename">Retail sales <span class="badge med">Med</span></div><div class="enote">~15th of month. Beat = strong consumer = less cut urgency. Miss = growth scare into the open.</div></div>
+      </div>
+      <div class="event">
+        <span class="etime">5:30 AM PT</span>
+        <div><div class="ename">GDP advance / revision <span class="badge high">High</span></div><div class="enote">Quarterly (advance ~last Thu of Jan/Apr/Jul/Oct). Advance print moves most. Negative print = recession confirmation.</div></div>
+      </div>
+    </div>
+
+    <div class="day-block">
+      <div class="day-header">Friday <span class="day-sub">Biggest vol potential — NFP + PCE</span></div>
+      <div class="event">
+        <span class="etime">5:30 AM PT</span>
+        <div><div class="ename">Non-farm payrolls (NFP) <span class="badge high">High</span></div><div class="enote">First Fri of month. The most anticipated release. Miss = Fed pivot narrative. Beat = hawkish fear. Avg hourly earnings equally important. Futures gap at open.</div></div>
+      </div>
+      <div class="event">
+        <span class="etime">5:30 AM PT</span>
+        <div><div class="ename">PCE price index <span class="badge high">High</span></div><div class="enote">Last Fri of month. Fed's preferred inflation gauge. Target = core PCE MoM at 0.17% or below.</div></div>
+      </div>
+      <div class="event">
+        <span class="etime">5:30 AM PT</span>
+        <div><div class="ename">Personal income &amp; spending <span class="badge low">Low</span></div><div class="enote">Released with PCE. Spending trend confirms or contradicts retail sales direction.</div></div>
+      </div>
+      <div class="event">
+        <span class="etime">7:00 AM PT</span>
+        <div><div class="ename">UMich consumer sentiment (final) <span class="badge low">Low</span></div><div class="enote">Last Fri of month. 5-yr inflation expectations sub-index is the key watch — a move here gets Fed attention immediately.</div></div>
+      </div>
+    </div>
+
+    <div class="divider"></div>
+    <p class="footnote">
+      Times in Pacific (PT). PDT = UTC&minus;7 (Mar&ndash;Nov) &middot; PST = UTC&minus;8 (Nov&ndash;Mar).<br>
+      High = expect 0.5&ndash;2%+ ES/NQ move on release &middot; Med = 0.25&ndash;0.75% directional &middot; Low = context/confirmation only.<br>
+      Verify exact monthly dates:
+      <a href="https://www.bls.gov/schedule/news_release/econ.htm" target="_blank">BLS release schedule</a> &middot;
+      <a href="https://www.federalreserve.gov/newsevents/calendar.htm" target="_blank">Fed events calendar</a>
+    </p>
+  </div>
+
+</div>
+<script>
+let autoTimer = null;
+let savedKey = '';
+
+function switchTab(name, el) {
+  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+  document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
+  document.getElementById('panel-' + name).classList.add('active');
+  el.classList.add('active');
+}
+
+const SERIES = [
+  { id: 'FEDFUNDS',        fmt: v => v.toFixed(2) + '%',                       suffix: 'target range' },
+  { id: 'CPIAUCSL',        fmt: v => v.toFixed(1) + '%',                       suffix: 'YoY change',    yoy: true },
+  { id: 'PCEPILFE',        fmt: v => v.toFixed(1) + '%',                       suffix: 'YoY change',    yoy: true },
+  { id: 'DGS10',           fmt: v => v.toFixed(2) + '%',                       suffix: 'daily' },
+  { id: 'DGS2',            fmt: v => v.toFixed(2) + '%',                       suffix: 'daily' },
+  { id: 'T10Y2Y',          fmt: v => v.toFixed(2) + '%',                       suffix: 'spread' },
+  { id: 'UNRATE',          fmt: v => v.toFixed(1) + '%',                       suffix: 'latest month' },
+  { id: 'ICSA',            fmt: v => Math.round(v).toLocaleString(),           suffix: 'weekly (thousands)' },
+  { id: 'A191RL1Q225SBEA', fmt: v => v.toFixed(1) + '%',                       suffix: 'QoQ annualized' },
+  { id: 'RSXFS',           fmt: v => (v >= 0 ? '+' : '') + v.toFixed(1) + '%', suffix: 'MoM change',    mom: true },
+  { id: 'MANEMP',          fmt: v => Math.round(v).toLocaleString() + 'K',     suffix: 'thousands' },
+  { id: 'UMCSENT',         fmt: v => v.toFixed(1),                             suffix: 'UMich index' },
+];
+
+async function fetchSeries(id, apiKey) {
+  const url = `https://api.stlouisfed.org/fred/series/observations?series_id=${id}&api_key=${apiKey}&sort_order=desc&limit=14&file_type=json`;
+  const r = await fetch(url);
+  if (!r.ok) throw new Error(String(r.status));
+  const d = await r.json();
+  if (d.error_message) throw new Error('auth');
+  return d.observations.filter(o => o.value !== '.').slice(0, 14);
+}
+
+function ptDate() {
+  return new Date().toLocaleTimeString('en-US', {
+    timeZone: 'America/Los_Angeles',
+    hour: 'numeric', minute: '2-digit', timeZoneName: 'short'
+  });
+}
+
+function setStatus(msg, type) {
+  const el = document.getElementById('status');
+  el.innerHTML = msg;
+  el.className = 'status' + (type ? ' ' + type : '');
+}
+
+async function loadAll() {
+  const keyInput = document.getElementById('apiKey');
+  const apiKey = keyInput.value.trim() || savedKey;
+  if (!apiKey) { setStatus('Please enter your FRED API key.', 'error'); return; }
+  savedKey = apiKey;
+
+  const loadBtn = document.getElementById('loadBtn');
+  loadBtn.disabled = true;
+  loadBtn.textContent = 'Loading...';
+  setStatus('Fetching data from FRED...');
+
+  SERIES.forEach(s => {
+    const card = document.getElementById('card-' + s.id);
+    const vEl  = document.getElementById('val-'  + s.id);
+    if (!card) return;
+    card.classList.remove('loaded', 'error');
+    card.classList.add('loading');
+    vEl.textContent = '—';
+  });
+
+  let loaded = 0, authErr = false;
+
+  for (const s of SERIES) {
+    const vEl  = document.getElementById('val-'  + s.id);
+    const mEl  = document.getElementById('meta-' + s.id);
+    const card = document.getElementById('card-' + s.id);
+    if (!vEl) continue;
+
+    try {
+      const obs = await fetchSeries(s.id, apiKey);
+      if (!obs.length) throw new Error('empty');
+
+      let val;
+      if (s.yoy) {
+        const v = parseFloat(obs[0].value);
+        const v12 = parseFloat((obs[13] || obs[obs.length - 1]).value);
+        val = isNaN(v12) ? v : ((v - v12) / v12 * 100);
+      } else if (s.mom) {
+        const v  = parseFloat(obs[0].value);
+        const v1 = parseFloat(obs[1]?.value);
+        val = isNaN(v1) ? v : ((v - v1) / v1 * 100);
+      } else {
+        val = parseFloat(obs[0].value);
+      }
+
+      vEl.textContent = s.fmt(val);
+      mEl.textContent = s.suffix + ' · ' + obs[0].date;
+      card.classList.remove('loading', 'error');
+      card.classList.add('loaded');
+      loaded++;
+    } catch (e) {
+      card.classList.remove('loading');
+      card.classList.add('error');
+      if (e.message === '403' || e.message === '400' || e.message === 'auth') {
+        vEl.textContent = 'Key error';
+        mEl.textContent = 'Check your API key';
+        authErr = true;
+      } else {
+        vEl.textContent = '—';
+        mEl.textContent = 'unavailable';
+      }
+    }
+  }
+
+  loadBtn.disabled = false;
+  loadBtn.textContent = 'Load data';
+  document.getElementById('refreshBtn').classList.add('visible');
+
+  const now = ptDate();
+  document.getElementById('lastRefresh').textContent = 'Last updated ' + now;
+
+  if (authErr) {
+    setStatus('API key error — verify your key at fred.stlouisfed.org and try again.', 'error');
+  } else {
+    setStatus(`Loaded ${loaded} of ${SERIES.length} indicators &middot; ${now}`, 'success');
+  }
+}
+
+function toggleAutoRefresh() {
+  const enabled  = document.getElementById('autoRefresh').checked;
+  const seconds  = parseInt(document.getElementById('refreshInterval').value, 10);
+  if (autoTimer) { clearInterval(autoTimer); autoTimer = null; }
+  if (enabled) {
+    autoTimer = setInterval(() => { if (savedKey) loadAll(); }, seconds * 1000);
+  }
+}
+
+document.getElementById('refreshInterval').addEventListener('change', () => {
+  if (document.getElementById('autoRefresh').checked) toggleAutoRefresh();
+});
+
+document.getElementById('apiKey').addEventListener('keydown', e => {
+  if (e.key === 'Enter') loadAll();
+});
+</script>
+</body>
+</html>
